@@ -34,7 +34,7 @@ namespace http_handler {
             if (req.method() == http::verb::get || req.method() == http::verb::head) {
                 std::string str=std::string(req.target());
                 http::status status=http::status::ok;
-                if (str.compare(0,13,"/api/v1/maps/")==0) {
+                if (str.length()>13 && str.compare(0,13,"/api/v1/maps/")==0) {
                     std::string _id=str;
                     _id.erase(0, 13);
                     model::Map::Id id=model::Map::Id(_id);
@@ -92,7 +92,7 @@ namespace http_handler {
                             "}";
                     }
                 }
-                else if (str=="/api/v1/maps") {
+                else if (str=="/api/v1/maps" || str=="/api/v1/maps/") {
                     res = "[";
                     for (auto& map : game_.GetMaps()) {
                         res+="{\"id\": \""+*map.GetId()+"\", \"name\": \""+
