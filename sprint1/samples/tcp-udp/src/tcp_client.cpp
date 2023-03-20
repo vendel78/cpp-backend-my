@@ -26,16 +26,16 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-	net::io_context io_context;
-	tcp::socket socket{io_context};
-	socket.connect(endpoint, ec);
+    net::io_context io_context;
+    tcp::socket socket{io_context};
+    socket.connect(endpoint, ec);
 
-	if (ec) {
-	    std::cout << "Can't connect to server"sv << std::endl;
-	    return 1;
-	}
+    if (ec) {
+        std::cout << "Can't connect to server"sv << std::endl;
+        return 1;
+    }
 
-	// Отправляем данные и проверяем, что нет ошибки.
+    // Отправляем данные и проверяем, что нет ошибки.
 	socket.write_some(net::buffer("Hello, I'm client!\n"sv), ec);
 	if (ec) {
 	    std::cout << "Error sending data"sv << std::endl;

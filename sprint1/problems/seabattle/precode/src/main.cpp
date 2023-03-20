@@ -68,7 +68,93 @@ public:
     }
 
     void StartGame(tcp::socket& socket, bool my_initiative) {
-        // TODO: реализуйте самостоятельно
+        boost::system::error_code ec;
+        net::streambuf stream_buf;
+        while (!IsGameEnded()) {
+            try {
+                if (my_initiative) {
+                    PrintFields();
+                    std::string str;
+                    std::optional<std::pair<int, int>> coord;
+                    while (true) {
+                        std::cout << "You turn:"sv << std::endl;
+                        std::getline(std::cin, str);
+                        coord = ParseMove(str);
+                        if (coord != std::nullopt) break;
+                    }
+                    str+='\n';
+                    socket.write_some(net::buffer(str), ec);
+                    if (ec) {
+                        std::cout << "Error sending data"sv << std::endl;
+                        return;
+                    }
+                    net::read(socket, stream_buf,
+                              boost::asio::transfer_exactly(1), ec);
+                    std::string server_data{std::istreambuf_iterator<char>(&stream_buf),
+                                            std::istreambuf_iterator<char>()};
+                    SeabattleField::ShotResult res=(SeabattleField::ShotResult) server_data[0];
+                    switch (res) {
+                        case SeabattleField::ShotResult::HIT:
+                            std::cout << "Hit"sv << std::endl;
+                            other_field_.MarkHit(coord->second,coord->first);
+                            break;
+                        case SeabattleField::ShotResult::KILL:
+                            std::cout << "Kill"sv << std::endl;
+                            other_field_.MarkKill(coord->second,coord->first);
+                            break;
+                        case SeabattleField::ShotResult::MISS:
+                            std::cout << "Miss"sv << std::endl;
+                            other_field_.MarkMiss(coord->second,coord->first);
+                            my_initiative=!my_initiative;
+                            break;
+                    }
+                    if (ec) {
+                        std::cout << "Error reading data"sv << std::endl;
+                        return;
+                    }
+                } else {
+                    PrintFields();
+                    std::cout << "Wait turn..."sv << std::endl;
+                    net::read_until(socket, stream_buf, '\n', ec);
+                    std::string server_data{std::istreambuf_iterator<char>(&stream_buf),
+                                            std::istreambuf_iterator<char>()};
+                    if (ec) {
+                        std::cout << "Error reading data"sv << std::endl;
+                        return;
+                    }
+                    server_data.erase(2);
+                    std::cout << server_data << std::endl;
+                    auto coord = ParseMove(server_data);
+                    auto res=my_field_.Shoot(coord->second,coord->first);
+                    switch (res) {
+                        case SeabattleField::ShotResult::HIT:
+                            std::cout << "Hit"sv << std::endl;
+                            break;
+                        case SeabattleField::ShotResult::KILL:
+                            std::cout << "Kill"sv << std::endl;
+                            break;
+                        case SeabattleField::ShotResult::MISS:
+                            std::cout << "Miss"sv << std::endl;
+                            my_initiative=!my_initiative;
+                            break;
+                    }
+                    char8_t c=(char)res;
+                    socket.write_some(net::buffer(&c,1), ec);
+                    if (ec) {
+                        std::cout << "Error sending data"sv << std::endl;
+                        return;
+                    }
+                }
+            }
+            catch (std::exception &e) {
+                std::cerr << e.what() << std::endl;
+            }
+        }
+        if (my_initiative) {
+            std::cout << "You win!"sv << std::endl;
+        } else{
+            std::cout << "GAME OVER!"sv << std::endl;
+        }
     }
 
 private:
@@ -107,12 +193,42 @@ void StartServer(const SeabattleField& field, unsigned short port) {
     SeabattleAgent agent(field);
 
     // TODO: реализуйте самостоятельно
+    net::io_context io_context;
+
+    tcp::acceptor acceptor(io_context, tcp::endpoint(tcp::v4(), port));
+    std::cout << "Waiting for connection..."sv << std::endl;
+
+    boost::system::error_code ec;
+    tcp::socket socket{io_context};
+    acceptor.accept(socket, ec);
+
+    if (ec) {
+        std::cout << "Can't accept connection"sv << std::endl;
+        return;
+    }
 
     agent.StartGame(socket, false);
 };
 
 void StartClient(const SeabattleField& field, const std::string& ip_str, unsigned short port) {
     SeabattleAgent agent(field);
+
+    boost::system::error_code ec;
+    auto endpoint = tcp::endpoint(net::ip::make_address(ip_str, ec), port);
+
+    if (ec) {
+        std::cout << "Wrong IP format"sv << std::endl;
+        return;
+    }
+
+    net::io_context io_context;
+    tcp::socket socket{io_context};
+    socket.connect(endpoint, ec);
+
+    if (ec) {
+        std::cout << "Can't connect to server"sv << std::endl;
+        return;
+    }
 
     // TODO: реализуйте самостоятельно
 
